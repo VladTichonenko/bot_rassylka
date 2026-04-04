@@ -1,0 +1,12 @@
+node_modules
+.env
+.env.*
+!.env.example
+
+# Сессия и кэш whatsapp-web.js (не коммитить)
+.wwebjs_auth_general/
+.wwebjs_cache/
+
+# Локальные артефакты
+*.log
+.DS_Store

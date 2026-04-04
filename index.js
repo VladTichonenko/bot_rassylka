@@ -7,8 +7,8 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 
-const { detectLanguageFromText } = require(path.join(__dirname, '..', 'language-detector'));
-const { getLanguageFromPhone } = require(path.join(__dirname, '..', 'phone-utils'));
+const { detectLanguageFromText } = require('./language-detector');
+const { getLanguageFromPhone } = require('./phone-utils');
 const { askAI, generateNewsDigest } = require('./ai-service');
 const { readConfig, patchConfig } = require('./config-store');
 
