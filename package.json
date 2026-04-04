@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
-    "web:install": "npm ci --prefix web --include=dev",
+    "web:install": "npm ci --prefix web",
     "web:build": "npm run build --prefix web",
     "build": "npm run web:install && npm run web:build"
   },
