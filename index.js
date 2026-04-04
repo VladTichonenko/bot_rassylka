@@ -12,8 +12,15 @@ const { getLanguageFromPhone } = require('./phone-utils');
 const { askAI, generateNewsDigest } = require('./ai-service');
 const { readConfig, patchConfig } = require('./config-store');
 
-/** BOT_PORT важнее PORT: в монорепо в корневом .env часто PORT=3000 под другой сервис. На Railway задаётся PORT — BOT_PORT не задают. */
-const BOT_PORT = parseInt(process.env.BOT_PORT || process.env.PORT || '3002', 10);
+/**
+ * Локально / монорепо: BOT_PORT перекрывает PORT, если в корневом .env PORT занят другим сервисом.
+ * На Railway прокси шлёт только на process.env.PORT — если задать BOT_PORT в Variables, сайт «не отвечает».
+ */
+const onRailway = Boolean(process.env.RAILWAY_ENVIRONMENT);
+const BOT_PORT = parseInt(
+  onRailway ? process.env.PORT || '3000' : process.env.BOT_PORT || process.env.PORT || '3002',
+  10
+);
 const sessionPath = process.env.SESSION_PATH || path.join(__dirname, '.wwebjs_auth_general');
 const clientId = process.env.WWEBJS_CLIENT_ID || 'general-ai-wabot';
 const USE_POLLING = process.env.USE_POLLING !== '0' && process.env.USE_POLLING !== 'false';
