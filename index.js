@@ -16,7 +16,10 @@ const { readConfig, patchConfig } = require('./config-store');
  * Локально / монорепо: BOT_PORT перекрывает PORT, если в корневом .env PORT занят другим сервисом.
  * На Railway прокси шлёт только на process.env.PORT — если задать BOT_PORT в Variables, сайт «не отвечает».
  */
-const onRailway = Boolean(process.env.RAILWAY_ENVIRONMENT);
+/** Railway задаёт PORT и часто RAILWAY_PROJECT_ID / RAILWAY_ENVIRONMENT (в Docker тоже). */
+const onRailway = Boolean(
+  process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID || process.env.RAILWAY_PUBLIC_DOMAIN
+);
 const BOT_PORT = parseInt(
   onRailway ? process.env.PORT || '3000' : process.env.BOT_PORT || process.env.PORT || '3002',
   10
@@ -86,6 +89,7 @@ async function sendMessageSafely(msg, text, client) {
 }
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json());
 
