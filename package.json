@@ -1,0 +1,22 @@
+{
+  "name": "general-ai-whatsapp-bot",
+  "version": "1.0.0",
+  "description": "Универсальный WhatsApp-бот с ИИ (любые темы)",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "web:install": "npm install --prefix web",
+    "web:build": "npm run build --prefix web",
+    "build": "npm run web:build"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.34.6"
+  }
+}

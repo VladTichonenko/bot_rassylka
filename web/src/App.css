@@ -1,0 +1,8 @@
+/* layout tweaks only — main styles in index.css */
+
+.stack-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
