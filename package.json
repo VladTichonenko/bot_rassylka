@@ -6,9 +6,9 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
-    "web:install": "npm install --prefix web",
+    "web:install": "npm ci --prefix web --include=dev",
     "web:build": "npm run build --prefix web",
-    "build": "npm run web:build"
+    "build": "npm run web:install && npm run web:build"
   },
   "license": "ISC",
   "dependencies": {
