@@ -170,10 +170,15 @@ async function runNewsBroadcast() {
   }
 }
 
+const puppeteerExecutable = process.env.PUPPETEER_EXECUTABLE_PATH
+  ? String(process.env.PUPPETEER_EXECUTABLE_PATH).trim()
+  : undefined;
+
 const client = new Client({
   authStrategy: new LocalAuth({ dataPath: sessionPath, clientId }),
   puppeteer: {
     headless: true,
+    ...(puppeteerExecutable ? { executablePath: puppeteerExecutable } : {}),
     protocolTimeout: parseInt(process.env.PROTOCOL_TIMEOUT_MS, 10) || 180000,
     args: [
       '--no-sandbox',

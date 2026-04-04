@@ -1,0 +1,10 @@
+node_modules
+web/node_modules
+web/dist
+.git
+.wwebjs_auth_general
+.wwebjs_cache
+.env
+.env.*
+*.log
+.DS_Store
