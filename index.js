@@ -116,16 +116,171 @@ function clearScheduleTimer() {
   }
 }
 
+function normalizePlannedBroadcasts(raw, fallbackTimezone) {
+  if (!Array.isArray(raw)) return [];
+  const fallbackTz = String(fallbackTimezone || 'UTC').trim() || 'UTC';
+  const prepared = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const id = String(item.id || `pb_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`).trim();
+    const scheduleAt = String(item.scheduleAt || '').trim();
+    const scheduleTimezone = String(item.scheduleTimezone || fallbackTz).trim() || fallbackTz;
+    const prompt = String(item.prompt || '').trim();
+    const source = String(item.source || 'manual').trim() === 'weekly' ? 'weekly' : 'manual';
+    const weeklyRuleId = source === 'weekly' ? String(item.weeklyRuleId || '').trim() : '';
+    if (!scheduleAt) continue;
+    const at = new Date(scheduleAt).getTime();
+    if (Number.isNaN(at)) continue;
+    prepared.push({
+      id,
+      scheduleAt: new Date(at).toISOString(),
+      scheduleTimezone,
+      prompt,
+      source,
+      weeklyRuleId: weeklyRuleId || undefined
+    });
+  }
+  prepared.sort((a, b) => new Date(a.scheduleAt).getTime() - new Date(b.scheduleAt).getTime());
+  return prepared;
+}
+
+function dayKeyInTimezone(iso, timezone) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone || 'UTC',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(d);
+  } catch {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'UTC',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(d);
+  }
+}
+
+function validatePlannedBroadcasts(planned) {
+  const byDay = new Map();
+  for (const p of planned) {
+    const k = dayKeyInTimezone(p.scheduleAt, p.scheduleTimezone || 'UTC');
+    if (!k) continue;
+    const c = (byDay.get(k) || 0) + 1;
+    byDay.set(k, c);
+    if (c > 2) {
+      return `На ${k} задано больше 2 рассылок.`;
+    }
+  }
+  return null;
+}
+
+function normalizeWeeklyBroadcastRules(raw, fallbackTimezone) {
+  if (!Array.isArray(raw)) return [];
+  const fallbackTz = String(fallbackTimezone || 'UTC').trim() || 'UTC';
+  const prepared = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const id = String(item.id || `wr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`).trim();
+    const weekday = Number(item.weekday);
+    const time = String(item.time || '').trim();
+    const prompt = String(item.prompt || '').trim();
+    const scheduleTimezone = String(item.scheduleTimezone || fallbackTz).trim() || fallbackTz;
+    if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) continue;
+    if (!/^\d{2}:\d{2}$/.test(time)) continue;
+    prepared.push({
+      id,
+      weekday,
+      time,
+      prompt,
+      scheduleTimezone
+    });
+  }
+  prepared.sort((a, b) => (a.weekday - b.weekday) || a.time.localeCompare(b.time));
+  return prepared;
+}
+
+function validateWeeklyBroadcastRules(rules) {
+  const byWeekday = new Map();
+  for (const rule of rules) {
+    const c = (byWeekday.get(rule.weekday) || 0) + 1;
+    byWeekday.set(rule.weekday, c);
+    if (c > 2) return 'Для одного дня недели можно задать максимум 2 рассылки.';
+  }
+  return null;
+}
+
+function expandWeeklyRulesToPlannedBroadcasts(rules) {
+  const now = new Date();
+  const end = new Date(now);
+  end.setMonth(end.getMonth() + 3);
+  const endTs = end.getTime();
+  const planned = [];
+  for (const rule of rules) {
+    const [hh, mm] = rule.time.split(':').map((n) => Number(n));
+    if (Number.isNaN(hh) || Number.isNaN(mm)) continue;
+    const cursor = new Date(now);
+    cursor.setHours(0, 0, 0, 0);
+    const diff = (rule.weekday - cursor.getDay() + 7) % 7;
+    cursor.setDate(cursor.getDate() + diff);
+    while (cursor.getTime() <= endTs) {
+      const at = new Date(cursor);
+      at.setHours(hh, mm, 0, 0);
+      if (at.getTime() > Date.now() && at.getTime() <= endTs) {
+        const stamp = `${at.getFullYear()}${String(at.getMonth() + 1).padStart(2, '0')}${String(at.getDate()).padStart(2, '0')}${String(hh).padStart(2, '0')}${String(mm).padStart(2, '0')}`;
+        planned.push({
+          id: `wk_${rule.id}_${stamp}`,
+          scheduleAt: at.toISOString(),
+          scheduleTimezone: rule.scheduleTimezone,
+          prompt: rule.prompt,
+          source: 'weekly',
+          weeklyRuleId: rule.id
+        });
+      }
+      cursor.setDate(cursor.getDate() + 7);
+    }
+  }
+  planned.sort((a, b) => new Date(a.scheduleAt).getTime() - new Date(b.scheduleAt).getTime());
+  return planned;
+}
+
+function buildPlannedBroadcastsFromConfig(cfg) {
+  const planned = normalizePlannedBroadcasts(cfg.plannedBroadcasts, cfg.scheduleTimezone);
+  if (planned.length) return planned;
+  const weeklyRules = normalizeWeeklyBroadcastRules(cfg.weeklyBroadcastRules, cfg.scheduleTimezone);
+  if (weeklyRules.length) return expandWeeklyRulesToPlannedBroadcasts(weeklyRules);
+  if (cfg.scheduleAt) {
+    const at = new Date(cfg.scheduleAt).getTime();
+    if (!Number.isNaN(at) && at > Date.now()) {
+      return [
+        {
+          id: `legacy_${at}`,
+          scheduleAt: new Date(at).toISOString(),
+          scheduleTimezone: cfg.scheduleTimezone || 'UTC',
+          prompt: ''
+        }
+      ];
+    }
+  }
+  return [];
+}
+
 function scheduleNextBroadcast() {
   clearScheduleTimer();
   const cfg = readConfig();
-  if (!cfg.scheduleAt) return;
-  const at = new Date(cfg.scheduleAt).getTime();
-  if (Number.isNaN(at)) return;
+  const planned = buildPlannedBroadcastsFromConfig(cfg).filter((p) => new Date(p.scheduleAt).getTime() > Date.now());
+  if (!planned.length) return;
+  const next = planned[0];
+  const at = new Date(next.scheduleAt).getTime();
   const ms = at - Date.now();
   if (ms <= 0) return;
   scheduleTimer = setTimeout(() => {
-    runNewsBroadcast().catch((e) => console.error('Scheduled broadcast:', e.message));
+    runNewsBroadcast({ plannedId: next.id, prompt: next.prompt, isScheduled: true })
+      .catch((e) => console.error('Scheduled broadcast:', e.message))
+      .finally(() => scheduleNextBroadcast());
   }, ms);
 }
 
@@ -151,12 +306,18 @@ function looksLikeWhatsAppId(chatId) {
   return typeof chatId === 'string' && /@(g|c)\.us$/i.test(chatId.trim());
 }
 
-async function runNewsBroadcast() {
+async function runNewsBroadcast(options = {}) {
   if (!botReady) {
     throw new Error('WhatsApp ещё не готов.');
   }
+  const plannedId = String(options.plannedId || '').trim();
+  const runPrompt = String(options.prompt || '').trim();
+  const isScheduled = Boolean(options.isScheduled);
   const cfg = readConfig();
   let targetId = cfg.newsTargetChatId;
+  const planned = buildPlannedBroadcastsFromConfig(cfg);
+  const selectedPlanned = plannedId ? planned.find((p) => p.id === plannedId) : null;
+  const effectivePrompt = runPrompt || (selectedPlanned?.prompt ? String(selectedPlanned.prompt).trim() : '');
   try {
     if (!targetId || !String(targetId).trim()) {
       targetId = await resolveNewsChatId(cfg);
@@ -166,17 +327,23 @@ async function runNewsBroadcast() {
         throw new Error('Некорректный ID чата WhatsApp (ожидается …@g.us или …@c.us).');
       }
     }
-    const text = await generateNewsDigest(cfg, 'ru');
+    const text = await generateNewsDigest(cfg, 'ru', effectivePrompt);
     await client.sendMessage(targetId, text);
+    const remainingPlanned = selectedPlanned ? planned.filter((p) => p.id !== selectedPlanned.id) : planned;
     patchConfig({
       newsTargetChatId: targetId,
       lastBroadcastAt: new Date().toISOString(),
       lastBroadcastError: null,
-      scheduleAt: null
+      scheduleAt: null,
+      plannedBroadcasts: remainingPlanned
     });
   } catch (e) {
     const msg = e.message || String(e);
-    patchConfig({ lastBroadcastError: msg });
+    const remainingPlanned = selectedPlanned ? planned.filter((p) => p.id !== selectedPlanned.id) : planned;
+    patchConfig({
+      lastBroadcastError: msg,
+      plannedBroadcasts: isScheduled ? remainingPlanned : planned
+    });
     throw e;
   }
 }
@@ -436,6 +603,8 @@ app.put('/api/config', requireAdmin, (req, res) => {
     'rules',
     'groupInviteUrl',
     'scheduleAt',
+    'plannedBroadcasts',
+    'weeklyBroadcastRules',
     'scheduleTimezone',
     'newsTargetChatId',
     'newsTargetTitle'
@@ -471,6 +640,64 @@ app.put('/api/config', requireAdmin, (req, res) => {
       });
     }
   }
+  const currentCfg = readConfig();
+  const fallbackTimezone = patch.scheduleTimezone || currentCfg.scheduleTimezone;
+  const hasPlannedPatch = Object.prototype.hasOwnProperty.call(patch, 'plannedBroadcasts');
+  const hasWeeklyPatch = Object.prototype.hasOwnProperty.call(patch, 'weeklyBroadcastRules');
+
+  const existingPlanned = normalizePlannedBroadcasts(currentCfg.plannedBroadcasts, fallbackTimezone);
+  const existingManual = existingPlanned.filter((p) => p.source !== 'weekly');
+  const existingWeekly = existingPlanned.filter((p) => p.source === 'weekly');
+
+  let manualPlanned = existingManual;
+  if (hasPlannedPatch) {
+    manualPlanned = normalizePlannedBroadcasts(patch.plannedBroadcasts, fallbackTimezone).map((p) => ({
+      ...p,
+      source: 'manual',
+      weeklyRuleId: undefined
+    }));
+    patch.scheduleAt = null;
+  }
+
+  let weeklyRules = normalizeWeeklyBroadcastRules(currentCfg.weeklyBroadcastRules, fallbackTimezone);
+  if (hasWeeklyPatch) {
+    weeklyRules = normalizeWeeklyBroadcastRules(patch.weeklyBroadcastRules, fallbackTimezone);
+    const weeklyErr = validateWeeklyBroadcastRules(weeklyRules);
+    if (weeklyErr) {
+      return res.status(400).json({
+        success: false,
+        error: weeklyErr
+      });
+    }
+    patch.weeklyBroadcastRules = weeklyRules;
+    patch.scheduleAt = null;
+  }
+
+  if (hasPlannedPatch || hasWeeklyPatch) {
+    const weeklyPlanned = hasWeeklyPatch ? expandWeeklyRulesToPlannedBroadcasts(weeklyRules) : existingWeekly;
+    const combinedPlanned = normalizePlannedBroadcasts(
+      [...manualPlanned, ...weeklyPlanned],
+      fallbackTimezone
+    );
+    const now = Date.now();
+    for (const p of combinedPlanned) {
+      const t = new Date(p.scheduleAt).getTime();
+      if (t <= now) {
+        return res.status(400).json({
+          success: false,
+          error: 'Все плановые рассылки должны быть в будущем.'
+        });
+      }
+    }
+    const plannedErr = validatePlannedBroadcasts(combinedPlanned);
+    if (plannedErr) {
+      return res.status(400).json({
+        success: false,
+        error: plannedErr
+      });
+    }
+    patch.plannedBroadcasts = combinedPlanned;
+  }
   const next = patchConfig(patch);
   scheduleNextBroadcast();
   res.json({ success: true, config: next });
@@ -478,10 +705,40 @@ app.put('/api/config', requireAdmin, (req, res) => {
 
 app.post('/api/broadcast/run', requireAdmin, async (req, res) => {
   try {
-    await runNewsBroadcast();
+    const prompt = String((req.body || {}).prompt || '').trim();
+    await runNewsBroadcast({ prompt });
     res.json({ success: true, config: readConfig() });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message || String(e), config: readConfig() });
+  }
+});
+
+app.post('/api/weekly/refresh', requireAdmin, (req, res) => {
+  try {
+    const cfg = readConfig();
+    const fallbackTimezone = cfg.scheduleTimezone || 'UTC';
+    const weeklyRules = normalizeWeeklyBroadcastRules(cfg.weeklyBroadcastRules, fallbackTimezone);
+    const weeklyErr = validateWeeklyBroadcastRules(weeklyRules);
+    if (weeklyErr) {
+      return res.status(400).json({ success: false, error: weeklyErr, config: cfg });
+    }
+    const manualPlanned = normalizePlannedBroadcasts(cfg.plannedBroadcasts, fallbackTimezone).filter(
+      (p) => p.source !== 'weekly'
+    );
+    const weeklyPlanned = expandWeeklyRulesToPlannedBroadcasts(weeklyRules);
+    const combinedPlanned = normalizePlannedBroadcasts([...manualPlanned, ...weeklyPlanned], fallbackTimezone);
+    const plannedErr = validatePlannedBroadcasts(combinedPlanned);
+    if (plannedErr) {
+      return res.status(400).json({ success: false, error: plannedErr, config: cfg });
+    }
+    const next = patchConfig({
+      weeklyBroadcastRules: weeklyRules,
+      plannedBroadcasts: combinedPlanned
+    });
+    scheduleNextBroadcast();
+    return res.json({ success: true, config: next });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message || String(e), config: readConfig() });
   }
 });
 

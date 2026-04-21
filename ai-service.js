@@ -1,6 +1,7 @@
 const axios = require('axios');
 const path = require('path');
 require('./load-env');
+const { BROADCAST_KNOWLEDGE_BASE } = require('./broadcast-knowledge-base');
 
 const AI_API_URL =
   process.env.AI_API_URL || 'https://api.intelligence.io.solutions/api/v1/chat/completions';
@@ -210,8 +211,10 @@ ${envExtra}
 /**
  * Текст одной рассылки для группы (новостной дайджест).
  * @param {{ theme?: string, role?: string, rules?: string }} config
+ * @param {string} userLanguage
+ * @param {string} broadcastPrompt
  */
-async function generateNewsDigest(config = {}, userLanguage = 'ru') {
+async function generateNewsDigest(config = {}, userLanguage = 'ru', broadcastPrompt = '') {
   const apiKey = getAiApiKey();
   if (!apiKey) {
     throw new Error(
@@ -224,19 +227,30 @@ async function generateNewsDigest(config = {}, userLanguage = 'ru') {
   const theme = String(config.theme || '').trim();
   const role = String(config.role || '').trim();
   const rules = String(config.rules || '').trim();
+  const prompt = String(broadcastPrompt || '').trim();
 
-  const systemPrompt = `Ты новостной бот для WhatsApp. Подготовь один готовый пост-дайджест на ${langName} языке.
+  const systemPrompt = `Ты бот рассылок WhatsApp. Подготовь один готовый пост на ${langName} языке.
 ${theme ? `ОБЯЗАТЕЛЬНАЯ тематика и угол: ${theme}. Не уходи в сторонние темы.` : 'Тематика общая — актуальный краткий обзор.'}
 ${role ? `Роль и тон (соблюдай): ${role}.` : ''}
 ${rules ? `Правила оформления и содержания (соблюдай строго):\n${rules}` : ''}
+${prompt ? `Специальный промпт для этой конкретной рассылки (высший приоритет, выполнять строго):\n${prompt}` : ''}
+
+База знаний (используй как единственный источник фактов, если нужен факт):
+${BROADCAST_KNOWLEDGE_BASE}
+
+КРИТИЧЕСКИЕ ПРАВИЛА:
+1) Если есть специальный промпт рассылки, текст должен соответствовать ему в первую очередь.
+2) Используй только факты из базы знаний и из промпта рассылки.
+3) Не выдумывай данные, проценты, имена, даты, цены и результаты.
+4) Если факта нет в базе, не фантазируй — дай нейтральную формулировку без неподтвержденных деталей.
 
 Требования: один блок текста для отправки в чат; без заголовков с символом #; эмодзи — умеренно; длина примерно 400–2000 символов; не выдумывай конкретные даты событий и цифры, если не уверен — формулируй осторожно.`;
 
   const userDigestAsk =
-    theme || role || rules
+    theme || role || rules || prompt
       ? userLanguage === 'en'
-        ? `Write one message for the group digest. Stay strictly within the theme, role and rules from the system message.`
-        : `Напиши одно сообщение для группы. Строго в рамках темы, роли и правил из системного сообщения — без отступлений.`
+        ? `Write one broadcast message. Follow the dedicated broadcast prompt strictly and use only verified facts from the provided knowledge base.`
+        : `Напиши одно сообщение-рассылку. Строго выполни специальный промпт рассылки и используй только проверенные факты из базы знаний.`
       : userLanguage === 'en'
         ? `Write today’s short news digest for the group (one message).`
         : 'Напиши краткий новостной дайджест для группы (одно сообщение).';

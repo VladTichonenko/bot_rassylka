@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const CONFIG_PATH = process.env.BOT_CONFIG_PATH || path.join(__dirname, 'bot-config.json');
+const DEFAULT_TIMEZONE = 'Asia/Almaty';
 
 const defaultConfig = () => ({
   theme: '',
@@ -11,8 +12,12 @@ const defaultConfig = () => ({
   groupInviteUrl: '',
   /** ISO 8601 — однократная рассылка */
   scheduleAt: null,
+  /** Плановые рассылки (до 2 на день) */
+  plannedBroadcasts: [],
+  /** Еженедельные правила (до 2 рассылок на день недели) */
+  weeklyBroadcastRules: [],
   /** IANA, для отображения и ввода даты в UI */
-  scheduleTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+  scheduleTimezone: DEFAULT_TIMEZONE,
   /** Заполняется после успешной отправки / join */
   newsTargetChatId: null,
   /** Название группы для панели (после выбора по имени или вручную) */
