@@ -6,6 +6,7 @@ const qrcode = require('qrcode-terminal');
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
+const { DateTime } = require('luxon');
 
 const { detectLanguageFromText } = require('./language-detector');
 const { getLanguageFromPhone } = require('./phone-utils');
@@ -213,34 +214,47 @@ function validateWeeklyBroadcastRules(rules) {
   return null;
 }
 
+/**
+ * weekday в правилах: как в JS getDay() — 0=воскресенье … 6=суббота.
+ * Время rule.time — стена часов в rule.scheduleTimezone (IANA).
+ * Раньше использовался локальный пояс процесса Node — на UTC-серверах слоты уезжали или оказывались в прошлом.
+ */
 function expandWeeklyRulesToPlannedBroadcasts(rules) {
-  const now = new Date();
-  const end = new Date(now);
-  end.setMonth(end.getMonth() + 3);
-  const endTs = end.getTime();
   const planned = [];
+  const now = DateTime.now();
+  const end = now.plus({ months: 3 });
+
   for (const rule of rules) {
-    const [hh, mm] = rule.time.split(':').map((n) => Number(n));
+    const tz = String(rule.scheduleTimezone || 'UTC').trim() || 'UTC';
+    const [hh, mm] = String(rule.time || '')
+      .split(':')
+      .map((n) => Number(n));
     if (Number.isNaN(hh) || Number.isNaN(mm)) continue;
-    const cursor = new Date(now);
-    cursor.setHours(0, 0, 0, 0);
-    const diff = (rule.weekday - cursor.getDay() + 7) % 7;
-    cursor.setDate(cursor.getDate() + diff);
-    while (cursor.getTime() <= endTs) {
-      const at = new Date(cursor);
-      at.setHours(hh, mm, 0, 0);
-      if (at.getTime() > Date.now() && at.getTime() <= endTs) {
-        const stamp = `${at.getFullYear()}${String(at.getMonth() + 1).padStart(2, '0')}${String(at.getDate()).padStart(2, '0')}${String(hh).padStart(2, '0')}${String(mm).padStart(2, '0')}`;
+    const luxonWeekday = rule.weekday === 0 ? 7 : rule.weekday;
+
+    let zoneNow = now.setZone(tz);
+    if (!zoneNow.isValid) {
+      zoneNow = now.setZone('UTC');
+    }
+    let day = zoneNow.startOf('day');
+    const limit = end.setZone(zoneNow.zone).endOf('day');
+
+    while (day <= limit) {
+      const slot = day.set({ hour: hh, minute: mm, second: 0, millisecond: 0 });
+      if (slot.weekday === luxonWeekday && slot > now && slot <= end) {
+        const iso = slot.toUTC().toISO();
+        if (!iso) continue;
+        const stamp = slot.setZone(tz).toFormat('yyyyMMddHHmm');
         planned.push({
           id: `wk_${rule.id}_${stamp}`,
-          scheduleAt: at.toISOString(),
-          scheduleTimezone: rule.scheduleTimezone,
+          scheduleAt: iso,
+          scheduleTimezone: tz,
           prompt: rule.prompt,
           source: 'weekly',
           weeklyRuleId: rule.id
         });
       }
-      cursor.setDate(cursor.getDate() + 7);
+      day = day.plus({ days: 1 });
     }
   }
   planned.sort((a, b) => new Date(a.scheduleAt).getTime() - new Date(b.scheduleAt).getTime());
@@ -339,10 +353,9 @@ async function runNewsBroadcast(options = {}) {
     });
   } catch (e) {
     const msg = e.message || String(e);
-    const remainingPlanned = selectedPlanned ? planned.filter((p) => p.id !== selectedPlanned.id) : planned;
     patchConfig({
       lastBroadcastError: msg,
-      plannedBroadcasts: isScheduled ? remainingPlanned : planned
+      plannedBroadcasts: planned
     });
     throw e;
   }
@@ -522,6 +535,14 @@ client.on('disconnected', (r) => {
   botReady = false;
   lastQr = null;
   clearScheduleTimer();
+  if (r === 'LOGOUT') {
+    console.warn('Сессия WhatsApp завершена (LOGOUT). Запустите бота снова и при необходимости отсканируйте QR.');
+    return;
+  }
+  setTimeout(() => {
+    console.log('Повторная инициализация WhatsApp после обрыва…');
+    client.initialize().catch((e) => console.error('re-init:', e.message));
+  }, 4000);
 });
 
 client.on('message', registerMessageHandler);

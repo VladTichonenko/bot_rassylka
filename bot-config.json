@@ -1,14 +1,119 @@
 {
-  "theme": "расскажи про симсонов",
-  "role": "ты барт симпсон",
-  "rules": "краткое сообщение",
+  "theme": "Образовательная экосистема ZERDELI и республиканская математическая олимпиада «Алтын сака»: ценность для детей 3–6 классов, платформа AltynSaqa.online, рост участников и итоги этапов — только по фактам из базы знаний.",
+  "role": "Ты специалист по коммуникации ZERDELI: уважительно, без давления и агрессивных продаж, поддерживающий и экспертный тон; без ярлыков в адрес детей и родителей.",
+  "rules": "Один цельный текст для WhatsApp; без заголовков с #; эмодзи умеренно; 400–2000 символов; не придумывай цифры, имена, даты и цены — бери только из базы знаний; если факта нет — нейтрально и без обещаний «чуда за 1–2 урока»; при упоминании услуг допускаются только цифры из базы (пробный 1490 ₸, курсы от 35 000 ₸, приём с 7 лет и т.д.).",
   "groupInviteUrl": "",
   "scheduleAt": null,
-  "plannedBroadcasts": [],
-  "weeklyBroadcastRules": [],
+  "plannedBroadcasts": [
+    {
+      "id": "wk_wr_1776896452813_2ltevw_202604300331",
+      "scheduleAt": "2026-04-29T22:31:00.000Z",
+      "scheduleTimezone": "Asia/Almaty",
+      "prompt": "напиши статью как придумали формулу площади круга",
+      "source": "weekly",
+      "weeklyRuleId": "wr_1776896452813_2ltevw"
+    },
+    {
+      "id": "wk_wr_1776896452813_2ltevw_202605070331",
+      "scheduleAt": "2026-05-06T22:31:00.000Z",
+      "scheduleTimezone": "Asia/Almaty",
+      "prompt": "напиши статью как придумали формулу площади круга",
+      "source": "weekly",
+      "weeklyRuleId": "wr_1776896452813_2ltevw"
+    },
+    {
+      "id": "wk_wr_1776896452813_2ltevw_202605140331",
+      "scheduleAt": "2026-05-13T22:31:00.000Z",
+      "scheduleTimezone": "Asia/Almaty",
+      "prompt": "напиши статью как придумали формулу площади круга",
+      "source": "weekly",
+      "weeklyRuleId": "wr_1776896452813_2ltevw"
+    },
+    {
+      "id": "wk_wr_1776896452813_2ltevw_202605210331",
+      "scheduleAt": "2026-05-20T22:31:00.000Z",
+      "scheduleTimezone": "Asia/Almaty",
+      "prompt": "напиши статью как придумали формулу площади круга",
+      "source": "weekly",
+      "weeklyRuleId": "wr_1776896452813_2ltevw"
+    },
+    {
+      "id": "wk_wr_1776896452813_2ltevw_202605280331",
+      "scheduleAt": "2026-05-27T22:31:00.000Z",
+      "scheduleTimezone": "Asia/Almaty",
+      "prompt": "напиши статью как придумали формулу площади круга",
+      "source": "weekly",
+      "weeklyRuleId": "wr_1776896452813_2ltevw"
+    },
+    {
+      "id": "wk_wr_1776896452813_2ltevw_202606040331",
+      "scheduleAt": "2026-06-03T22:31:00.000Z",
+      "scheduleTimezone": "Asia/Almaty",
+      "prompt": "напиши статью как придумали формулу площади круга",
+      "source": "weekly",
+      "weeklyRuleId": "wr_1776896452813_2ltevw"
+    },
+    {
+      "id": "wk_wr_1776896452813_2ltevw_202606110331",
+      "scheduleAt": "2026-06-10T22:31:00.000Z",
+      "scheduleTimezone": "Asia/Almaty",
+      "prompt": "напиши статью как придумали формулу площади круга",
+      "source": "weekly",
+      "weeklyRuleId": "wr_1776896452813_2ltevw"
+    },
+    {
+      "id": "wk_wr_1776896452813_2ltevw_202606180331",
+      "scheduleAt": "2026-06-17T22:31:00.000Z",
+      "scheduleTimezone": "Asia/Almaty",
+      "prompt": "напиши статью как придумали формулу площади круга",
+      "source": "weekly",
+      "weeklyRuleId": "wr_1776896452813_2ltevw"
+    },
+    {
+      "id": "wk_wr_1776896452813_2ltevw_202606250331",
+      "scheduleAt": "2026-06-24T22:31:00.000Z",
+      "scheduleTimezone": "Asia/Almaty",
+      "prompt": "напиши статью как придумали формулу площади круга",
+      "source": "weekly",
+      "weeklyRuleId": "wr_1776896452813_2ltevw"
+    },
+    {
+      "id": "wk_wr_1776896452813_2ltevw_202607020331",
+      "scheduleAt": "2026-07-01T22:31:00.000Z",
+      "scheduleTimezone": "Asia/Almaty",
+      "prompt": "напиши статью как придумали формулу площади круга",
+      "source": "weekly",
+      "weeklyRuleId": "wr_1776896452813_2ltevw"
+    },
+    {
+      "id": "wk_wr_1776896452813_2ltevw_202607090331",
+      "scheduleAt": "2026-07-08T22:31:00.000Z",
+      "scheduleTimezone": "Asia/Almaty",
+      "prompt": "напиши статью как придумали формулу площади круга",
+      "source": "weekly",
+      "weeklyRuleId": "wr_1776896452813_2ltevw"
+    },
+    {
+      "id": "wk_wr_1776896452813_2ltevw_202607160331",
+      "scheduleAt": "2026-07-15T22:31:00.000Z",
+      "scheduleTimezone": "Asia/Almaty",
+      "prompt": "напиши статью как придумали формулу площади круга",
+      "source": "weekly",
+      "weeklyRuleId": "wr_1776896452813_2ltevw"
+    }
+  ],
+  "weeklyBroadcastRules": [
+    {
+      "id": "wr_1776896452813_2ltevw",
+      "weekday": 4,
+      "time": "03:31",
+      "prompt": "напиши статью как придумали формулу площади круга",
+      "scheduleTimezone": "Asia/Almaty"
+    }
+  ],
   "scheduleTimezone": "Asia/Almaty",
   "newsTargetChatId": "120363422589804687@g.us",
   "newsTargetTitle": "Тест",
-  "lastBroadcastAt": "2026-04-03T20:05:01.268Z",
+  "lastBroadcastAt": "2026-04-22T22:31:09.628Z",
   "lastBroadcastError": null
 }

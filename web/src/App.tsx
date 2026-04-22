@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { DateTime } from 'luxon'
 import { QRCodeSVG } from 'qrcode.react'
 import './App.css'
 
@@ -56,19 +57,48 @@ type TabKey = 'planned' | 'weekly' | 'now' | 'connect'
 
 const WEEKDAY_LABELS = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота']
 
-function isoToDatetimeLocal(iso: string | null): string {
+function isoToDatetimeLocal(iso: string | null, timeZone: string): string {
   if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  const z = (timeZone || DEFAULT_TIMEZONE).trim() || DEFAULT_TIMEZONE
+  const dt = DateTime.fromISO(iso, { zone: 'utc' }).setZone(z)
+  if (!dt.isValid) return ''
+  return dt.toFormat("yyyy-LL-dd'T'HH:mm")
 }
 
-function datetimeLocalToIso(s: string): string | null {
+/** Интерпретирует `YYYY-MM-DDTHH:mm` как локальное время в указанной IANA-зоне. */
+function datetimeLocalToIso(s: string, timeZone: string): string | null {
+  const z = (timeZone || DEFAULT_TIMEZONE).trim() || DEFAULT_TIMEZONE
   if (!s.trim()) return null
-  const d = new Date(s)
+  const dt = DateTime.fromISO(s.trim(), { zone: z })
+  if (!dt.isValid) return null
+  return dt.toUTC().toISO()
+}
+
+function dayKeyInTimezone(isoUtc: string, timeZone: string): string | null {
+  const z = (timeZone || DEFAULT_TIMEZONE).trim() || DEFAULT_TIMEZONE
+  const d = new Date(isoUtc)
   if (Number.isNaN(d.getTime())) return null
-  return d.toISOString()
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: z,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(d)
+  } catch {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'UTC',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(d)
+  }
+}
+
+function plannedInstantMs(slot: PlannedBroadcastForm, defaultTz: string): number {
+  const z = (slot.scheduleTimezone || defaultTz).trim() || DEFAULT_TIMEZONE
+  const dt = DateTime.fromISO(slot.scheduleAtLocal.trim(), { zone: z })
+  return dt.isValid ? dt.toUTC().toMillis() : Number.NaN
 }
 
 function todayLocalDate(): string {
@@ -85,13 +115,12 @@ function makeWeeklyRuleId(): string {
   return `wr_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 }
 
-function formatPlannedLocalDateTime(scheduleAtLocal: string): string {
+function formatPlannedLocalDateTime(scheduleAtLocal: string, timeZone: string): string {
   if (!scheduleAtLocal) return 'Дата и время не заданы'
-  const dt = new Date(scheduleAtLocal)
-  if (Number.isNaN(dt.getTime())) {
-    return scheduleAtLocal.replace('T', ' ')
-  }
-  return dt.toLocaleString()
+  const z = (timeZone || DEFAULT_TIMEZONE).trim() || DEFAULT_TIMEZONE
+  const dt = DateTime.fromISO(scheduleAtLocal.trim(), { zone: z })
+  if (!dt.isValid) return scheduleAtLocal.replace('T', ' ')
+  return dt.setLocale('ru').toLocaleString(DateTime.DATETIME_SHORT)
 }
 
 function nextThreeMonthsDatesForWeekday(weekday: number): string[] {
@@ -177,7 +206,7 @@ export default function App() {
           .filter((p) => p.source !== 'weekly')
           .map((p) => ({
           id: p.id,
-          scheduleAtLocal: isoToDatetimeLocal(p.scheduleAt),
+          scheduleAtLocal: isoToDatetimeLocal(p.scheduleAt, p.scheduleTimezone || c.scheduleTimezone || DEFAULT_TIMEZONE),
           scheduleTimezone: p.scheduleTimezone || c.scheduleTimezone || DEFAULT_TIMEZONE,
           prompt: p.prompt || ''
           })),
@@ -235,15 +264,15 @@ export default function App() {
     return form.plannedBroadcasts
       .map((item, idx) => ({ item, idx }))
       .sort((a, b) => {
-        const ta = new Date(a.item.scheduleAtLocal).getTime()
-        const tb = new Date(b.item.scheduleAtLocal).getTime()
+        const ta = plannedInstantMs(a.item, form.scheduleTimezone)
+        const tb = plannedInstantMs(b.item, form.scheduleTimezone)
         if (Number.isNaN(ta) && Number.isNaN(tb)) return 0
         if (Number.isNaN(ta)) return 1
         if (Number.isNaN(tb)) return -1
         return ta - tb
       })
       .map(({ idx }) => idx)
-  }, [form.plannedBroadcasts])
+  }, [form.plannedBroadcasts, form.scheduleTimezone])
 
   const canAddSlot = selectedDayIndexes.length < 2
 
@@ -339,7 +368,8 @@ export default function App() {
       const byDate = new Map<string, number>()
       const plannedPayload: PlannedBroadcast[] = []
       for (const item of form.plannedBroadcasts) {
-        const iso = datetimeLocalToIso(item.scheduleAtLocal)
+        const tz = item.scheduleTimezone || form.scheduleTimezone
+        const iso = datetimeLocalToIso(item.scheduleAtLocal, tz)
         if (!iso) {
           setSaveErr('Укажите корректную дату и время для всех плановых рассылок.')
           setBusy(false)
@@ -351,7 +381,12 @@ export default function App() {
           setBusy(false)
           return
         }
-        const dayKey = item.scheduleAtLocal.slice(0, 10)
+        const dayKey = dayKeyInTimezone(iso, tz)
+        if (!dayKey) {
+          setSaveErr('Некорректный часовой пояс. Укажите IANA, например Asia/Almaty.')
+          setBusy(false)
+          return
+        }
         const dayCount = (byDate.get(dayKey) || 0) + 1
         byDate.set(dayKey, dayCount)
         if (dayCount > 2) {
@@ -646,7 +681,8 @@ export default function App() {
                   </button>
                 </div>
                 <p className="hint" style={{ marginTop: '0.5rem' }}>
-                  Запланировано на: {formatPlannedLocalDateTime(slot.scheduleAtLocal)}
+                  Запланировано на:{' '}
+                  {formatPlannedLocalDateTime(slot.scheduleAtLocal, slot.scheduleTimezone || form.scheduleTimezone)}
                 </p>
                 <div className="field" style={{ marginTop: '0.75rem' }}>
                   <label htmlFor={`date-${slot.id}`}>Дата</label>
@@ -696,6 +732,10 @@ export default function App() {
               onChange={(e) => setForm((f) => ({ ...f, scheduleTimezone: e.target.value }))}
               placeholder="Europe/Moscow"
             />
+            <p className="hint">
+              Дата и время слотов считаются в этом часовом поясе. План сработает только если в это время запущен сервер
+              бота (например <code>npm start</code>) и WhatsApp остаётся подключённым.
+            </p>
           </div>
 
           {cfg?.lastBroadcastAt && <p className="hint">Последняя рассылка: {new Date(cfg.lastBroadcastAt).toLocaleString()}</p>}
